@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.gravity9.cardamon.test.EthServiceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2021-04-12T05:42:57" hostname="ijunhwan-ui-Macmini.local" time="0.732">
+  <properties/>
+  <testcase name="getEthClientVersionASync()" classname="com.gravity9.cardamon.test.EthServiceTest" time="0.732"/>
+  <system-out><![CDATA[EthereumJS TestRPC/v2.13.1/ethereum-js
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
