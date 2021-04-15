@@ -8,6 +8,11 @@ import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.TransactionEncoder;
+import org.web3j.protocol.Web3j;
 import org.web3j.protocol.admin.Admin;
 import org.web3j.protocol.admin.methods.response.PersonalUnlockAccount;
 import org.web3j.protocol.core.DefaultBlockParameterName;
@@ -17,27 +22,37 @@ import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
+import org.web3j.protocol.exceptions.TransactionException;
 import org.web3j.protocol.http.HttpService;
+import org.web3j.tx.Contract;
+import org.web3j.tx.FastRawTransactionManager;
+import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.TransactionManager;
+import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.tx.response.PollingTransactionReceiptProcessor;
+import org.web3j.tx.response.TransactionReceiptProcessor;
+import org.web3j.utils.Convert;
+import org.web3j.utils.Numeric;
 
 
 public class EthereumService {
 
     private String from = "0x62e3019dc896694E7018f6411D69A78Ba9221553";
+    private String fromPrivateKey = "2eb072f1fff1007cef319e5f9c1bcd2fc1fc25d82e0763fb707216e6df6b7347";
 
-    private String contract = "0xE4550068a45a21a009e34c529f993e94B9252b6b";
+    private String contractAddr = "0xE4550068a45a21a009e34c529f993e94B9252b6b";
 
-    // hardcording because of testing
-    private String pwd = "0x2eb072f1fff1007cef319e5f9c1bcd2fc1fc25d82e0763fb707216e6df6b7347";
 
-    private Admin web3j = null;
+    private Web3j web3j = null;
 
     public EthereumService()
     {
-        web3j = Admin.build(new HttpService("https://ropsten.infura.io/v3/184c26ddfb724b2189e054c66191b60c")); // default server : http://localhost:8545
+        web3j = Web3j.build(new HttpService("https://ropsten.infura.io/v3/184c26ddfb724b2189e054c66191b60c")); // default server : http://localhost:8545
+
     }
 
     public Object ethCall(Function function) throws IOException {
-        Transaction transaction = Transaction.createEthCallTransaction(from, contract,
+        Transaction transaction = Transaction.createEthCallTransaction(from, contractAddr,
                 FunctionEncoder.encode(function));
 
         //3. ethereum 호출후 결과 가져오기
@@ -53,62 +68,61 @@ public class EthereumService {
     public String ethSendTransaction(Function function)
             throws IOException, InterruptedException, ExecutionException {
 
-        // 1. Account Lock 해제
-        PersonalUnlockAccount personalUnlockAccount = web3j.personalUnlockAccount(from, pwd).send();
+        Credentials credential = getCredential(fromPrivateKey);
 
-        if (personalUnlockAccount.accountUnlocked()) { // unlock 일때
+        EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(from, DefaultBlockParameterName.LATEST).sendAsync().get();
+        BigInteger nonce = ethGetTransactionCount.getTransactionCount();
+        BigInteger gasLimit = Contract.GAS_LIMIT;
+        BigInteger gasPrice = Contract.GAS_PRICE;
+        String txData = FunctionEncoder.encode(function);
 
-            //2. account에 대한 nonce값 가져오기.
+
+        RawTransaction rawTransaction = RawTransaction.createTransaction(nonce, gasPrice, gasLimit, contractAddr, txData);
+
+
+        byte[] signedMessage = TransactionEncoder.signMessage(rawTransaction, credential);
+        String hexValue = Numeric.toHexString(signedMessage);
+
+        EthSendTransaction ethSendTransaction = web3j.ethSendRawTransaction(hexValue).send();
+        return ethSendTransaction.getResult();
+    }
+
+    public String updateContract(Function function)
+            throws IOException, InterruptedException, ExecutionException {
+
+        String encodedFunction = FunctionEncoder.encode(function);
+
+        EthSendTransaction ethCall = null;
+        try {
+            //Nonce
             EthGetTransactionCount ethGetTransactionCount = web3j.ethGetTransactionCount(
                     from, DefaultBlockParameterName.LATEST).sendAsync().get();
-
             BigInteger nonce = ethGetTransactionCount.getTransactionCount();
+            BigInteger gasPrice = Transaction.DEFAULT_GAS;
 
-            //3. Transaction값 제작
-            Transaction transaction = Transaction.createFunctionCallTransaction(from, nonce,
-                                                                                Transaction.DEFAULT_GAS,
-                                                                                null, contract,
-                                                                                FunctionEncoder.encode(function));
-
-            // 4. ethereum Call &
-            EthSendTransaction ethSendTransaction = web3j.ethSendTransaction(transaction).send();
-
-            // transaction에 대한 transaction Hash값 얻기.
-            String transactionHash = ethSendTransaction.getTransactionHash();
-
-            // ledger에 쓰여지기 까지 기다리기.
-            Thread.sleep(5000);
-
-            return transactionHash;
+            //Run
+            ethCall = web3j.ethSendTransaction(
+                    Transaction.createFunctionCallTransaction(
+                            from,
+                            nonce, //or nullL
+                            gasPrice, //gasPrice
+                            BigInteger.valueOf(900000), //gasLimit
+                            contractAddr,
+                            encodedFunction)
+            ).sendAsync().get();
+        }catch (Exception e) {
+            e.printStackTrace();
         }
-        else {
-            throw new PersonalLockException("check ethereum personal Lock");
-        }
+
+        String transactionHash = ethCall.getTransactionHash();
+
+        return transactionHash;
     }
 
-    public TransactionReceipt getReceipt(String transactionHash) throws IOException {
-
-        EthGetTransactionReceipt transactionReceipt = web3j.ethGetTransactionReceipt(transactionHash).send();
-
-        if(transactionReceipt.getTransactionReceipt().isPresent())
-        {
-            System.out.println("transactionReceipt.getResult().getContractAddress() = " +
-                               transactionReceipt.getResult());
-        }
-        else
-        {
-            System.out.println("transaction complete not yet");
-        }
-
-        return transactionReceipt.getResult();
+    private Credentials getCredential(String privateKeyInHex) {
+        BigInteger privateKeyInBT = new BigInteger(privateKeyInHex, 16);
+        ECKeyPair aPair = ECKeyPair.create(privateKeyInBT);
+        Credentials aCredential = Credentials.create(aPair);
+        return aCredential;
     }
-
-    private class PersonalLockException extends RuntimeException
-    {
-        public PersonalLockException(String msg)
-        {
-            super(msg);
-        }
-    }
-
 }

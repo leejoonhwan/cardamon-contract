@@ -98,6 +98,7 @@ public class Wallet {
 
             RawTransaction rawTransaction = RawTransaction.createEtherTransaction(nonce, gasPrice, gasLimit, receiverAddress, value);
 
+
         } catch (IOException e) {
             e.printStackTrace();
         }
