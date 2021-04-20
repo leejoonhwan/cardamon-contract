@@ -76,4 +76,8 @@ public class Nft {
         }
 
     }
+
+    private void txinfo () {
+
+    }
 }

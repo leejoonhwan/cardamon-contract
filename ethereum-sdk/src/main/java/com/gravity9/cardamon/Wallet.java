@@ -1,16 +1,12 @@
 package com.gravity9.cardamon;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.web3j.crypto.*;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.EthGetBalance;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.protocol.exceptions.TransactionException;
 import org.web3j.protocol.http.HttpService;
-import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -18,8 +14,6 @@ import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 public class Wallet {
 
